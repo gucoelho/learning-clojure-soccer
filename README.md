@@ -1,10 +1,20 @@
 # learning-with-soccer
 
-A Clojure library designed to ... well, that part is up to you.
+Project to learn and practice Clojure.
 
-## Usage
+Some goals:
 
-FIXME
+- Organize matches between teams using round-robin algorithm 
+- Support two turns tournaments
+- Separate matches in rounds
+- Simulate all matches results and winners
+- Generate tournament table
+    -  Points, Victories, Draws, Loses, Goal Pro, Goal Con, Goal Diff
+- Generate tournament statistics
+    - Team with best attack
+    - Team with worst defense
+    - Best away teams
+    - Best home teams
 
 ## License
 
