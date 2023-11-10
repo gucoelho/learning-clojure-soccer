@@ -1,6 +1,6 @@
 (ns learning-with-soccer.logic
-  (:require  [clojure.math :refer [round]]
-           [learning-with-soccer.core :as c]))
+  (:require [clojure.math :refer [round]]
+            [learning-with-soccer.core :as c]))
 
 (defn set-goal-home
   ([match goal]
@@ -15,8 +15,8 @@
    (assoc match :goals-away goal))
   ([match]
    (set-goal-away match (-> match
-                    :goals-away 0
-                    inc))))
+                            :goals-away 0
+                            inc))))
 
 (defn simulate-match
   [match]
