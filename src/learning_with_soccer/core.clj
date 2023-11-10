@@ -31,8 +31,10 @@
 (defn match-str
   [match]
   (let [home-team (:know-as (get-team (:home-team-id match)))
+        home-goals (:goals-home match)
+        away-goals (:goals-away match)
         away-team (:know-as (get-team (:away-team-id match)))]
-    (clojure.string/join " " [home-team "x" away-team]) ))
+    (clojure.string/join " " [home-team home-goals "x" away-goals away-team]) ))
 
 (defn round-robin-with-reduce
   [matched-teams, team]
@@ -58,9 +60,27 @@
           matches)
         )))
 
+
+(defn define-rounds
+  [matches]
+  (let [round-count 19]
+    (loop [round 1
+           defined-matches []
+           rest-matches matches]
+      (pprint round)
+      (if (< round round-count)
+        (recur (inc round) (assoc (first rest-matches) :round round) (rest rest-matches))
+        defined-matches))))
+
 (defn generate-tournament
   [teams]
   (let [matches (round-robin-with-loop teams)]
-    (map #(match-str %) matches)))
-(def tournament-str (clojure.string/join "\n" (generate-tournament all-teams)))
+    matches))
+
+(defn tournament-summary
+  [matches]
+  (map match-str matches))
+
+(def tournament-str (clojure.string/join "\n" (tournament-summary (generate-tournament all-teams))))
+
 (println tournament-str)
