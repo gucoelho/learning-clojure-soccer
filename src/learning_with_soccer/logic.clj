@@ -1,6 +1,9 @@
-(ns learning-with-soccer.logic
-  (:require [clojure.math :refer [round]]
-            [learning-with-soccer.core :as c]))
+(ns learning-with-soccer.logic)
+
+(defn make-match
+  [id home-team-id away-team-id] {:match-id     id
+                                  :home-team-id home-team-id
+                                  :away-team-id away-team-id})
 
 (defn set-goal-home
   ([match goal]
@@ -18,18 +21,19 @@
                             :goals-away 0
                             inc))))
 
-(defn simulate-match
-  [match]
-  (-> match
-      (set-goal-home (round (rand 4)))
-      (set-goal-away (round (rand 4)))))
 
-(defn simulate-tournament
-  [matches]
-  (map simulate-match matches))
-(->> (c/generate-tournament c/all-teams)
-     (simulate-tournament)
-     (c/tournament-summary)
-     (clojure.string/join "\n")
-     println)
+(defn generate-match-id
+  [team1 team2]
+  (str (:abbreviation team1) "x" (:abbreviation team2)))
+
+(defn round-robin
+  [teams]
+  (loop [rest-teams teams
+         matches    []]
+    (let [current-team   (first rest-teams)
+          eligible-teams (filter #(not (= (:team-id current-team) (:team-id %))) rest-teams)
+          new-matches    (map #(make-match (generate-match-id current-team %) (:team-id current-team) (:team-id %)) eligible-teams)]
+      (if (seq eligible-teams)
+        (recur eligible-teams (concat matches new-matches))
+        matches))))
 

@@ -1,32 +1,17 @@
 (ns learning-with-soccer.core
   (:use [clojure pprint])
-  (:require [clojure.string]))
+  (:require [clojure.string]
+            [clojure.math :refer [round]]
+            [learning-with-soccer.db :as db]
+            [learning-with-soccer.logic :as logic]
+            ))
 
-(defn make-team
-  "Create a team"
-  [id, abbreviation, full-name, know-as] {
-                                          :team-id      id
-                                          :abbreviation abbreviation
-                                          :full-name    full-name
-                                          :know-as      know-as})
-(def all-teams [(make-team (random-uuid) "SAN" "Santos Futebol Clube" "Santos")
-                (make-team (random-uuid) "PAL" "Associação Esportiva Palmeiras" "Palmeiras")
-                (make-team (random-uuid) "SPO" "São Paulo Futebol Clube" "São Paulo")
-                (make-team (random-uuid) "COR" "Sport Club Corinthians Paulista" "Corinthians")
-                (make-team (random-uuid) "RBR" "Red Bull Bragantino" "Bragantino")
-                (make-team (random-uuid) "BOT" "Botafogo" "Botafogo")
-                (make-team (random-uuid) "FLU" "Fluminense" "Fluminense")
-                (make-team (random-uuid) "FLA" "Clube de Regatas Flamengo" "Flamengo")])
 (defn get-team
   [id]
-  (->> all-teams
+  (->> db/all-teams
        (filter #(= (:team-id %) id))
        (first)))
-(defn make-match
-  [id home-team-id away-team-id] {:match-id     id
-                                  :home-team-id home-team-id
-                                  :away-team-id away-team-id
-                                  :status       :not-started})
+
 (defn match-str
   [match]
   (let [home-team  (:know-as (get-team (:home-team-id match)))
@@ -35,51 +20,69 @@
         away-team  (:know-as (get-team (:away-team-id match)))]
     (clojure.string/join " " [home-team home-goals "x" away-goals away-team])))
 
-(defn round-robin-with-reduce
-  [matched-teams, team]
-  (let [
-        eligible-teams (filter #(not (= (:team-id team) (:team-id %))) (:teams matched-teams))
-        matches        (:matches matched-teams)
-        new-matches    (map #(make-match (random-uuid) (:team-id team) (:team-id %)) eligible-teams)
-        ] {
-           :matches (concat new-matches matches)
-           :teams   eligible-teams
-           }))
+(defn get-teams-from-matches
+  [matches]
+  (->> matches
+       (map #(vals (select-keys % [:home-team-id :away-team-id])))
+       flatten
+       distinct
+       set))
 
-(defn round-robin-with-loop
-  [teams]
-  (loop [rest-teams teams
-         matches    []]
-    (let [
-          current-team   (first rest-teams)
-          eligible-teams (filter #(not (= (:team-id current-team) (:team-id %))) rest-teams)
-          new-matches    (map #(make-match (random-uuid) (:team-id current-team) (:team-id %)) eligible-teams)]
-      (if (seq eligible-teams)
-        (recur eligible-teams (concat matches new-matches))
-        matches)
-      )))
+(defn time-esta-nessa-rodada? [team-home team-away teams-in-round]
+  (or (contains? teams-in-round team-home)
+      (contains? teams-in-round team-away)))
 
+(defn adiciona-time-na-rodada
+  [match matches round]
+  (let [match-with-round (assoc match :round round)
+        new-round        (conj (get matches round) match-with-round)]
+    (assoc matches round new-round)))
+
+(defn proxima-rodada-que-nenhum-dos-dois-times-estao
+  [match defined-rounds]
+  (loop [round 1]
+    (let [round-matches  (get defined-rounds round)
+          teams-in-round (get-teams-from-matches round-matches)]
+      (if (time-esta-nessa-rodada? (:home-team-id match) (:away-team-id match) teams-in-round)
+        (recur (inc round))
+        round))))
 
 (defn define-rounds
   [matches]
-  (let [round-count 19]
-    (loop [round           1
-           defined-matches []
-           rest-matches    matches]
-      (pprint round)
-      (if (< round round-count)
-        (recur (inc round) (assoc (first rest-matches) :round round) (rest rest-matches))
-        defined-matches))))
+  (loop [
+         defined-matches {}
+         rest-matches    matches]
+    (if (not-empty rest-matches)
+      (let [current-match    (first rest-matches)
+            other-matches    (rest rest-matches)
+            match-round      (proxima-rodada-que-nenhum-dos-dois-times-estao current-match defined-matches)
+            round-with-match (adiciona-time-na-rodada current-match defined-matches match-round)]
+        (recur round-with-match other-matches))
+      defined-matches)))
 
 (defn generate-tournament
   [teams]
-  (let [matches (round-robin-with-loop teams)]
+  (let [matches (logic/round-robin teams)]
     matches))
+
+(println (define-rounds (generate-tournament db/all-teams)))
+(defn simulate-match!
+  [match]
+  (-> match
+      (logic/set-goal-home (round (rand 4)))
+      (logic/set-goal-away (round (rand 4)))))
+
+(defn simulate-tournament!
+  [matches]
+  (map simulate-match! matches))
 
 (defn tournament-summary
   [matches]
   (map match-str matches))
 
-(def tournament-str (clojure.string/join "\n" (tournament-summary (generate-tournament all-teams))))
-
-(println tournament-str)
+;
+;(->> (generate-tournament db/all-teams)
+;     (simulate-tournament!)
+;     (tournament-summary)
+;     (clojure.string/join "\n")
+;     println)
