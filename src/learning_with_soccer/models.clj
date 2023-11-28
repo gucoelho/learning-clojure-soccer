@@ -10,13 +10,16 @@
 
 (s/defschema Match
   "Schema that represents a soccer match"
-  {:match-id     s/Uuid
-   :home-team-id s/Uuid
-   :away-team-id s/Uuid
-   :goals-home   s/Int
-   :goals-away   s/Int
-   :round        s/Int})
+  {:match-id                    s/Str
+   :home-team-id                s/Uuid
+   :away-team-id                s/Uuid
+   (s/optional-key :goals-home) s/Int
+   (s/optional-key :goals-away) s/Int
+   (s/optional-key :round)      s/Int})
 
 (s/defschema Tournament
   "Schema that represents a tournament"
-  [Match])
+  {:matches [Match]
+   :teams   [Team]})
+
+(s/defschema MatchesGroupedByRound {s/Int [Match]})
