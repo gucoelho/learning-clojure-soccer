@@ -7,11 +7,11 @@
             [learning-with-soccer.logic :as logic]
             [schema.core :as s]))
 
-(defn get-team
-  [id]
+(s/defn get-team :- m/Team
+  [id :- m/TeamId]
   (->> db/all-teams
        (filter #(= (:team-id %) id))
-       (first)))
+       first))
 
 (s/defn match-str :- s/Str
   [match :- m/Match]
@@ -21,6 +21,8 @@
         away-team  (:know-as (get-team (:away-team-id match)))]
     (str home-team " " home-goals " x " away-goals " " away-team)))
 
+;TODO consider odd numbers of teams, add a dummy matches and filter
+;TODO consider two turns
 (s/defn generate-tournament :- m/Tournament
   [teams :- [m/Team]]
   (let [matches (logic/round-robin teams)]
@@ -28,63 +30,21 @@
 
 ; (println (logic/define-rounds (generate-tournament db/all-teams)))
 
-(defn simulate-match!
-  [match]
+(s/defn simulate-match! :- [m/Match]
+  [match :- m/Match]
   (-> match
       (logic/set-goal-home (round (rand 4)))
       (logic/set-goal-away (round (rand 4)))))
 
-(defn simulate-tournament!
-  [matches]
+(s/defn simulate-tournament!
+  [matches :- [m/Match]]
   (map simulate-match! matches))
-
 
 (def test-teams db/all-teams)
 
-(def t {:matches (simulate-tournament! (generate-tournament test-teams)) :teams test-teams})
+(def test-tournament {:matches (simulate-tournament! (generate-tournament test-teams)) :teams test-teams})
 
-(defn count-points [team acc match]
-  (let [winner-id (logic/winner match)]
-    (if (= nil winner-id)
-      (inc acc)
-      (if (= (:team-id team) winner-id)
-        (+ 3 acc)
-        acc))))
-
-(defn count-victories [team acc match]
-  (let [winner-id (logic/winner match)]
-    (if (= (:team-id team) winner-id)
-      (inc acc)
-      acc)))
-
-(defn count-draws [acc match]
-  (let [winner-id (logic/winner match)]
-    (if (= nil winner-id)
-      (inc acc)
-      acc)))
-
-(s/defn tournament-table
-  [tournament]
-  (let [matches (:matches tournament)
-        teams   (:teams tournament)]
-    (loop [
-           rest-teams (rest teams)
-           table      []]
-      (if-not (empty? rest-teams)
-        (let [team         (first rest-teams)
-              team-matches (logic/filter-by-team team matches)
-              points       (reduce #(count-points team %1 %2) 0 team-matches)
-              victories    (reduce #(count-victories team %1 %2) 0 team-matches)
-              draws        (reduce #(count-draws %1 %2) 0 team-matches)
-              looses       (- (count team-matches) (+ victories draws))]
-          (recur (rest rest-teams) (conj table {:team      (:know-as team)
-                                                :points    points
-                                                :victories victories
-                                                :draws     draws
-                                                :looses    looses})))
-        table))))
-
-(print-table (reverse (sort-by :points (tournament-table t))))
+(print-table (reverse (sort-by :points (logic/tournament-table test-tournament))))
 
 (defn tournament-summary
   [matches]

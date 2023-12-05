@@ -3,6 +3,7 @@
    [learning-with-soccer.models :as m]
    [schema.core :as s]))
 
+
 (s/defn make-match :- m/Match
   [id home-team-id away-team-id] {:match-id     id
                                   :home-team-id home-team-id
@@ -49,20 +50,23 @@
        set))
 
 (s/defn round-contains-teams? :- s/Bool
-  [team-home
-   team-away
-   teams-in-round]
+  [team-home :- m/TeamId
+   team-away :- m/TeamId
+   teams-in-round :- [m/TeamId]]
   (or (contains? teams-in-round team-home)
       (contains? teams-in-round team-away)))
 
-(s/defn add-team-to-round
-  [match matches round]
+(s/defn add-team-to-round :- [m/Match]
+  [match :- m/Match
+   matches :- [m/Match]
+   round :- m/MatchesGroupedByRound]
   (let [match-with-round (assoc match :round round)
         new-round        (conj (get matches round) match-with-round)]
     (assoc matches round new-round)))
 
 (s/defn next-round-available :- s/Int
-  [match defined-rounds]
+  [match :- m/Match
+   defined-rounds :- [m/MatchesGroupedByRound]]
   (loop [round 1]
     (let [round-matches  (get defined-rounds round)
           teams-in-round (get-teams-from-matches round-matches)]
@@ -93,10 +97,57 @@
    matches :- [m/Match]]
   (filter #(team-match? team %) matches))
 
-(s/defn winner
+(s/defn winner :- (s/maybe m/TeamId)
   [match :- m/Match]
   (let [home (:home-team-id match)
         away (:away-team-id match)]
-    (if (> (:goals-home match) (:goals-away match)) home
-                                                    (if (< (:goals-home match) (:goals-away match)) away
-                                                                                                    nil))))
+    (cond (> (:goals-home match) (:goals-away match)) home
+          (< (:goals-home match) (:goals-away match)) away
+          :else nil)))
+
+(s/defn count-points :- s/Int
+  [team :- m/Team
+   points :- s/Int
+   match :- m/Match]
+  (let [winner-id (winner match)]
+    (cond (= nil winner-id) (inc points)
+          (= (:team-id team) winner-id) (+ 3 points)
+          :else points)))
+
+(s/defn count-victories :- s/Int
+  [team :- m/Team
+   victories :- s/Int
+   match :- m/Match]
+  (let [winner-id (winner match)]
+    (if (= (:team-id team) winner-id)
+      (inc victories)
+      victories)))
+
+(s/defn count-draws :- s/Int
+  [draws :- s/Int
+   match :- m/Match]
+  (let [winner-id (winner match)]
+    (if (= nil winner-id)
+      (inc draws)
+      draws)))
+
+(s/defn tournament-table :- [m/TournamentTableRow]
+  [tournament :- m/Tournament]
+  (let [matches (:matches tournament)
+        teams   (:teams tournament)]
+    (loop [rest-teams (rest teams)
+           table      []]
+      (if-not (empty? rest-teams)
+        (let [team         (first rest-teams)
+              team-matches (filter-by-team team matches)
+              points       (reduce #(count-points team %1 %2) 0 team-matches)
+              victories    (reduce #(count-victories team %1 %2) 0 team-matches)
+              draws        (reduce #(count-draws %1 %2) 0 team-matches)
+              looses       (- (count team-matches) (+ victories draws))]
+          (recur (rest rest-teams) (conj table {:team      (:know-as team)
+                                                :points    points
+                                                :victories victories
+                                                :draws     draws
+                                                :looses    looses})))
+        table))))
+
